@@ -7,7 +7,7 @@ import time
 
 
 class ModelPDE(pde.PDEBase):
-    def __init__(self, bc, terrain, nu=10 / 3, eta=3.5, rho=0.95, gamma=50/3, delta_b=1/30, delta_w=10 / 3, delta_h=1e-3/3, a=33.33, q=0.05, f=0.1, p=0.5):
+    def __init__(self, bc, terrain, nu=10 / 3, eta=3.5, rho=0.95, gamma=50/3, delta_b=1/30, delta_w=10 / 3, delta_h=1e-2/3, a=33.33, q=0.05, f=0.1, p=0.5):
         self._nu = nu
         self._eta = eta
         self._rho = rho
@@ -90,10 +90,10 @@ class ModelPDE(pde.PDEBase):
 
 
 def main():
-    percipitation = 1.15
-    L = 10
-    years = 1500
-    n = 64
+    percipitation = 1.1
+    L = 20
+    years = 500
+    n = 128
     dx = L / n
     dt = 0.5 * np.power(dx, 2) * 1e-1
     shape = (n, n)
@@ -101,19 +101,20 @@ def main():
     if mpi.is_main:
         print(f"dt: {dt:.3e}, dx: {dx:.3e}, n: {n}, range: {grid_range}")
     grid = pde.CartesianGrid(grid_range, shape, periodic=[True, False])
-    b = pde.ScalarField(grid, 0.5 + np.random.random(shape) / 1e4)
-    w = pde.ScalarField(grid, 0.5)
-    h = pde.ScalarField(grid, 0.5)
+    b = pde.ScalarField(grid, 0. + np.random.random(shape) / 1e4)
+    w = pde.ScalarField(grid, percipitation / 10 * 3)
+    h = pde.ScalarField(grid, percipitation / 10 * 3)
     state = pde.FieldCollection([b, w, h])
 
     terrain = pde.ScalarField(
-        grid, np.fromfunction(lambda _, y: y / 1e3, shape))
+        grid, np.fromfunction(lambda _, y: y / 1e2, shape))
 
     bc_dirichlet_zero = {"value": 0}
     bc_zero_derivative = {"derivative": 0}
+    bc_zero_flux = {"curvature": 0}
     bc_periodic = "auto_periodic_neumann"
-    bc = [bc_periodic, [bc_dirichlet_zero, bc_zero_derivative]]
-    # bc = bc_periodic
+    bc = [bc_periodic, [bc_zero_flux, bc_zero_derivative]]
+    bc = bc_periodic
 
     t = time.localtime()
     timestamp = time.strftime("%m%d_%H%M%S", t)

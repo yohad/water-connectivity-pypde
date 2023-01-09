@@ -11,43 +11,49 @@ def get_last_storage(storage_dir):
 
 
 def create_animation_func(ts, data):
-    fig, (ax_b, ax_w, ax_h) = plt.subplots(1, 3)
+    fig, ax_b = plt.subplots(1, 1)
 
     t0 = ts[0]
+    title = fig.suptitle(f"$t = {t0:.1f}$")
     b0, w0, h0 = data[0, :, :, :]
 
-    im_b = ax_b.imshow(b0, cmap="YlGn")
-    fig.colorbar(im_b)
-    fig.set_figheight(5)
-    fig.set_figwidth(15)
+    lims = (0, 0.3)
 
-    im_w = ax_w.imshow(w0)
-    im_h = ax_h.imshow(h0)
+    im_b = ax_b.imshow(b0, cmap="YlGn", clim=lims, origin="lower")
+    title_b = ax_b.set_title(f"$b(x,y)$")
+    fig.colorbar(im_b, fraction=0.046, pad=0.04)
+
+    # fig.set_figheight(4)
+    # fig.set_figwidth(12)
 
     def animation_func(frame):
         t = frame[0]
-        print(t)
+        print(f"{t:.2f}")
         b, w, h = frame[1]
 
+        title.set_text(f"$t={t:.1f}$")
         im_b.set_array(b)
-        im_w.set_array(w)
-        im_h.set_array(h)
+
         plt.draw()
-        return [im_b, im_w, im_h]
+        return [im_b]
 
     return fig, zip(ts[1:], data[1:, :, :, :]), animation_func
 
 
 def main():
-    storage_path = get_last_storage("data")
+    storage_path = get_last_storage("storage")
+    # storage_path = "storage/storage-1207_144632.h5"
     with h5py.File(storage_path, "r") as f:
-        data = np.array(f["data"])
+        data = np.array(f["data"]).transpose(0, 1, 3, 2)
         ts = np.array(f["times"])
 
     fig, frames, animation_func = create_animation_func(ts, data)
     ani = animation.FuncAnimation(
-        fig, animation_func, frames, blit=True, interval=1, repeat=False)
-    plt.show()
+        fig, animation_func, frames, blit=True, interval=1, repeat=False, save_count=1000)
+
+    # plt.show()
+    FFwriter = animation.FFMpegWriter(fps=10)
+    ani.save('animation.mp4', writer=FFwriter)
 
 
 if __name__ == "__main__":
