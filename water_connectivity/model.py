@@ -1,13 +1,31 @@
 import numpy as np
 import numba as nb
+import os
+from time import time
+from pathlib import Path
 import pde
 from pde.tools import mpi
-from pde.solvers import Controller, ExplicitMPISolver
-import time
+from pde.solvers import Controller
+from pde.solvers.explicit_mpi import ExplicitMPISolver
 
 
 class ModelPDE(pde.PDEBase):
-    def __init__(self, bc, terrain, nu=10 / 3, eta=3.5, rho=0.95, gamma=50/3, delta_b=1/30, delta_w=10 / 3, delta_h=1e-2/3, a=33.33, q=0.05, f=0.1, p=0.5):
+    def __init__(
+        self,
+        bc,
+        terrain,
+        nu=10 / 3,
+        eta=3.5,
+        rho=0.95,
+        gamma=50 / 3,
+        delta_b=1 / 30,
+        delta_w=10 / 3,
+        delta_h=1e-2 / 3,
+        a=33.33,
+        q=0.05,
+        f=0.1,
+        p=0.5,
+    ):
         self._nu = nu
         self._eta = eta
         self._rho = rho
@@ -59,8 +77,7 @@ class ModelPDE(pde.PDEBase):
 
             # Calculate time derivatives
             rate[0] = gb * b * (1 - b) - b + delta_b * laplace(b)
-            rate[1] = i * h - nu * (1 - rho * b) * w - gw * \
-                w + delta_w * laplace(w)
+            rate[1] = i * h - nu * (1 - rho * b) * w - gw * w + delta_w * laplace(w)
             rate[2] = p - i * h - div(j)
 
             return rate
@@ -82,56 +99,47 @@ class ModelPDE(pde.PDEBase):
 
         # Calculate time derivatives
         b_t = gb * b * (1 - b) - b + self._delta_b * b.laplace(self._bc)
-        w_t = i * h - self._nu * (1 - self._rho * b) * w - gw * w + \
-            self._delta_w * w.laplace(self._bc)
+        w_t = (
+            i * h
+            - self._nu * (1 - self._rho * b) * w
+            - gw * w
+            + self._delta_w * w.laplace(self._bc)
+        )
         h_t = self._p - i * h - j.divergence(self._bc)
 
         return pde.FieldCollection([b_t, w_t, h_t])
 
 
-def main():
-    percipitation = 1.1
-    L = 20
-    years = 500
-    n = 128
+def run_simulation(output: Path, n: int, tmax: int, L: int, percipitation: float):
+    # define constants for simulation
     dx = L / n
     dt = 0.5 * np.power(dx, 2) * 1e-1
     shape = (n, n)
     grid_range = [(0, L), (0, L)]
     if mpi.is_main:
         print(f"dt: {dt:.3e}, dx: {dx:.3e}, n: {n}, range: {grid_range}")
+
+    # create the problem to solve
     grid = pde.CartesianGrid(grid_range, shape, periodic=[True, False])
-    b = pde.ScalarField(grid, 0. + np.random.random(shape) / 1e4)
+    terrain = pde.ScalarField(grid, np.fromfunction(lambda _, y: y / 1e2, shape))
+
+    b = pde.ScalarField(grid, 0.0)
     w = pde.ScalarField(grid, percipitation / 10 * 3)
     h = pde.ScalarField(grid, percipitation / 10 * 3)
     state = pde.FieldCollection([b, w, h])
 
-    terrain = pde.ScalarField(
-        grid, np.fromfunction(lambda _, y: y / 1e2, shape))
-
-    bc_dirichlet_zero = {"value": 0}
     bc_zero_derivative = {"derivative": 0}
     bc_zero_flux = {"curvature": 0}
     bc_periodic = "auto_periodic_neumann"
     bc = [bc_periodic, [bc_zero_flux, bc_zero_derivative]]
-    bc = bc_periodic
-
-    t = time.localtime()
-    timestamp = time.strftime("%m%d_%H%M%S", t)
-    backup_path = "storage\storage-" + timestamp + ".h5"
-    storage = pde.FileStorage(backup_path)
 
     eq = ModelPDE(bc, terrain, p=percipitation)
-
     solver = ExplicitMPISolver(eq)
-    controller = Controller(solver, t_range=years, tracker=[
-                            "progress", storage.tracker(1)])
-    sol = controller.run(state, dt=dt)
-    if mpi.is_main:
-        video_path = f"results\movie-{timestamp}.mp4"
-        pde.movie(storage, filename=video_path,
-                  plot_args={"cmap": "YlGn"})
+    storage = pde.FileStorage(output)
 
+    controller = Controller(
+        solver, t_range=tmax, tracker=["progress", storage.tracker(1)]
+    )
+    results = controller.run(state, dt=dt)
 
-if __name__ == '__main__':
-    main()
+    return results
