@@ -1,5 +1,4 @@
-results/
-save/
-storage/
 .vscode/
 __pycache__/
+water_connectivity/output/raw/*
+water_connectivity/output/video/*
