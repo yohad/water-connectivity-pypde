@@ -5,6 +5,7 @@ import os
 import model
 import plotter
 from pde.tools import mpi
+from post_processing import get_water_flux
 
 
 def parse_arguments():
@@ -23,6 +24,7 @@ def parse_arguments():
         "--dimensions",
         action="store",
         default=128,
+        type=int,
         help="Size of simulation grid",
     )
     parser.add_argument(
@@ -30,6 +32,7 @@ def parse_arguments():
         "--side-length",
         action="store",
         default=20,
+        type=float,
         help="Length of the side of the region, in meters",
     )
     parser.add_argument(
@@ -72,7 +75,7 @@ def main():
     safe_makedirs(output_video)
     output_video = os.path.join(output_video, unique_name) + ".mp4"
 
-    model.run_simulation(
+    terrain = model.run_simulation(
         output_raw, args.dimensions, args.run_time, args.side_length, args.percipitation
     )
 

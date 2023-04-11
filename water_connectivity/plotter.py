@@ -5,71 +5,63 @@ import matplotlib.animation as animation
 import numpy as np
 import tqdm
 
-
-def calculate_flux(h):
-    """
-    h has the form ts X ny X nx
-    """
-    boundary = h[:, 0:2, :]
-    diff = np.diff(boundary, axis=1)
-    flux = -np.sum(diff, axis=(1, 2))
-    return flux
+from post_processing import get_water_flux, post_processing
 
 
-def create_animation_func(ts, data, pbar):
-    flux = calculate_flux(data[:, 2, :, :])
+def dict_to_frames(processed):
+    ts = processed["times"]
+    b = processed["vegetation"]
+    flux = processed["flux"]
 
-    fig, axs = plt.subplots(1, 3)
-    ax_b = axs[0]
-    ax_h = axs[1]
-    ax_f = axs[2]
+    frames = []
+    for i in range(len(ts)):
+        frames.append((ts[i], b[i], flux[i]))
 
+    return frames
+
+
+def create_animation_func(processed, pbar):
+    ts = processed["times"]
+    b = processed["vegetation"]
+    flux = processed["flux"]
+    
+    fig, axs = plt.subplots(1, 2, figsize=(10, 6))
     fig.tight_layout(h_pad=2.0, w_pad=5.0)
-
-    ax_f.plot(ts, flux)
-    ax_f.grid()
-
-    t0 = ts[0]
-    title = fig.suptitle(f"$t = {t0:.1f}[yr]$")
-    b0, w0, h0 = data[0, :, :, :]
-
-    b = data[0]
-    h = data[2]
-
-    b_lims = (np.min(b), np.max(b))
+    title = fig.suptitle(f"$t = {ts[0]:.1f}[yr]$")
+    
+    ax_b = axs[0]
+    ax_b.set_title("Vegetation")
+    b0 = b[0]
+    b_lims = (0, np.max(b[20:]))
     im_b = ax_b.imshow(b0, cmap="YlGn", clim=b_lims, origin="lower")
-    # title_b = ax_b.set_title("$b(x,y)$")
     fig.colorbar(im_b, fraction=0.046, pad=0.04)
-
-    h_lims = (np.min(h), np.max(h))
-    im_h = ax_h.imshow(h0, cmap="YlGn", clim=h_lims, origin="lower")
-    fig.colorbar(im_h, fraction=0.046, pad=0.04)
-
-    # fig.set_figheight(4)
-    # fig.set_figwidth(12)
+    
+    ax_flux = axs[1]
+    ax_flux.set_title("Water Flux")
+    flux0 = flux[0]
+    flux_lims = (np.min(flux), np.max(flux))
+    im_flux, = ax_flux.plot(flux0)
 
     def animation_func(frame):
-        t = frame[0]
         pbar.update(1)
-        b, _, h = frame[1]
+        t, b, flux = frame
 
-        title.set_text(f"$t={t:.1f}$")
+        title.set_text(f"$t={t:.1f}[yr]$")
+        
         im_b.set_array(b)
-        im_h.set_array(h)
+        im_flux.set_ydata(flux)
 
         plt.draw()
-        return [im_b]
+        return [im_b, im_flux]
 
-    return fig, zip(ts[1:], data[1:, :, :, :]), animation_func
+    return fig, dict_to_frames(processed), animation_func
 
 
 def plot(path_raw, path_video):
-    with h5py.File(path_raw, "r") as f:
-        data = np.array(f["data"]).transpose(0, 1, 3, 2)
-        ts = np.array(f["times"])
+    processed = post_processing(path_raw)
 
-    pbar = tqdm.tqdm(total=len(ts))
-    fig, frames, animation_func = create_animation_func(ts, data, pbar)
+    pbar = tqdm.tqdm(total=len(processed["times"]))
+    fig, frames, animation_func = create_animation_func(processed, pbar)
     ani = animation.FuncAnimation(
         fig,
         animation_func,
@@ -77,7 +69,6 @@ def plot(path_raw, path_video):
         blit=True,
         interval=1,
         repeat=False,
-        save_count=1000,
     )
 
     # plt.show()

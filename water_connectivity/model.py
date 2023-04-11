@@ -1,4 +1,5 @@
 import numpy as np
+import h5py
 import numba as nb
 import os
 from time import time
@@ -7,6 +8,8 @@ import pde
 from pde.tools import mpi
 from pde.solvers import Controller
 from pde.solvers.explicit_mpi import ExplicitMPISolver
+
+from h5py_utils import write_field
 
 
 class ModelPDE(pde.PDEBase):
@@ -123,9 +126,9 @@ def run_simulation(output: Path, n: int, tmax: int, L: int, percipitation: float
     grid = pde.CartesianGrid(grid_range, shape, periodic=[True, False])
     terrain = pde.ScalarField(grid, np.fromfunction(lambda _, y: y / 1e2, shape))
 
-    b = pde.ScalarField(grid, 0.0)
-    w = pde.ScalarField(grid, percipitation / 10 * 3)
-    h = pde.ScalarField(grid, percipitation / 10 * 3)
+    b = pde.ScalarField.random_uniform(grid, 0.6, 0.6 + 1e-6)
+    w = pde.ScalarField(grid, 0)
+    h = pde.ScalarField(grid, 0)
     state = pde.FieldCollection([b, w, h])
 
     bc_zero_derivative = {"derivative": 0}
@@ -140,6 +143,10 @@ def run_simulation(output: Path, n: int, tmax: int, L: int, percipitation: float
     controller = Controller(
         solver, t_range=tmax, tracker=["progress", storage.tracker(1)]
     )
-    results = controller.run(state, dt=dt)
-
-    return results
+    controller.run(state, dt=dt)
+    
+    # write_field(output, terrain.data, "terrain")
+    
+    if mpi.is_main:
+        with h5py.File(output, "a") as f:
+            f.create_dataset("terrain", data=terrain.data)
