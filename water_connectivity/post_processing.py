@@ -15,7 +15,8 @@ def post_processing(path_raw):
         ts = np.array(f["times"])
         terrain = np.array(f["terrain"])
     
-    results = {"flux": get_water_flux(h, terrain), "vegetation": b, "times": ts}
+    results = {"flux": get_water_flux(h, terrain), "vegetation": b, "times": ts,
+               "surface_water": h, "soil_water": w}
 
     return results
 
@@ -26,5 +27,5 @@ def get_water_flux(h, zeta):
     """
     derivative = np.gradient(h + zeta, axis=1)
     flux = h * derivative
-    flux_aggregate = np.sum(flux, axis=2)
-    return flux_aggregate
+    # flux_aggregate = np.sum(flux, axis=2)
+    return flux

@@ -51,6 +51,15 @@ def parse_arguments():
         default="output",
         help="Where should the simulation results be saved to",
     )
+    parser.add_argument(
+        "-s",
+        "--slope",
+        action="store",
+        dest="slope",
+        default=1e-2,
+        type=float,
+        help="Slope of the terrain",
+    )
 
     return parser.parse_args()
 
@@ -65,7 +74,7 @@ def safe_makedirs(path):
 def main():
     args = parse_arguments()
 
-    unique_name = f"output_{int(time())}"
+    unique_name = f"output_{int(time())}_p{args.percipitation}_s{args.slope}".replace(".", "_")
 
     output_raw = os.path.join(args.output, "raw")
     safe_makedirs(output_raw)
@@ -76,7 +85,7 @@ def main():
     output_video = os.path.join(output_video, unique_name) + ".mp4"
 
     terrain = model.run_simulation(
-        output_raw, args.dimensions, args.run_time, args.side_length, args.percipitation
+        output_raw, args.dimensions, args.run_time, args.side_length, args.percipitation, args.slope
     )
 
     if mpi.is_main:

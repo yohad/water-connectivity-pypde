@@ -113,7 +113,7 @@ class ModelPDE(pde.PDEBase):
         return pde.FieldCollection([b_t, w_t, h_t])
 
 
-def run_simulation(output: Path, n: int, tmax: int, L: int, percipitation: float):
+def run_simulation(output: Path, n: int, tmax: int, L: int, percipitation: float, slope: float):
     # define constants for simulation
     dx = L / n
     dt = 0.5 * np.power(dx, 2) * 1e-1
@@ -124,9 +124,9 @@ def run_simulation(output: Path, n: int, tmax: int, L: int, percipitation: float
 
     # create the problem to solve
     grid = pde.CartesianGrid(grid_range, shape, periodic=[True, False])
-    terrain = pde.ScalarField(grid, np.fromfunction(lambda _, y: y / 1e2, shape))
+    terrain = pde.ScalarField(grid, np.fromfunction(lambda _, y: y * slope, shape))
 
-    b = pde.ScalarField.random_uniform(grid, 0.6, 0.6 + 1e-6)
+    b = pde.ScalarField.random_uniform(grid, 0, 1e-6)
     w = pde.ScalarField(grid, 0)
     h = pde.ScalarField(grid, 0)
     state = pde.FieldCollection([b, w, h])
@@ -150,3 +150,6 @@ def run_simulation(output: Path, n: int, tmax: int, L: int, percipitation: float
     if mpi.is_main:
         with h5py.File(output, "a") as f:
             f.create_dataset("terrain", data=terrain.data)
+            f.create_dataset("dx", data=dx)
+            f.create_dataset("dt", data=dt)
+            f.create_dataset("p", data=percipitation)
