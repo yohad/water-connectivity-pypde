@@ -27,5 +27,4 @@ def get_water_flux(h, zeta):
     """
     derivative = np.gradient(h + zeta, axis=1)
     flux = h * derivative
-    # flux_aggregate = np.sum(flux, axis=2)
     return flux

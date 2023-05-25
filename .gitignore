@@ -2,3 +2,4 @@
 __pycache__/
 water_connectivity/output/raw/*
 water_connectivity/output/video/*
+water_connectivity/output_*/*

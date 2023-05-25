@@ -27,8 +27,8 @@ def create_animation_func(processed, pbar):
     h = processed["surface_water"]
     flux = processed["flux"]
     
-    fig, axs = plt.subplots(1, 3)
-    fig.tight_layout(h_pad=2.0, w_pad=5.0)
+    fig, axs = plt.subplots(1, 2)
+    # fig.tight_layout(h_pad=2.0, w_pad=5.0)
     title = fig.suptitle(f"$t = {ts[0]:.1f}[yr]$")
     
     ax_b = axs[0]
@@ -38,17 +38,16 @@ def create_animation_func(processed, pbar):
     im_b = ax_b.imshow(b0, cmap="YlGn", clim=b_lims, origin="lower")
     fig.colorbar(im_b, location="bottom")
     
-    ax_flux = axs[1]
-    ax_flux.set_title("Water Flux")
-    flux0 = flux[0]
-    flux_lims = (-np.max(np.abs(flux)), np.max(np.abs(flux)))
-    im_flux = ax_flux.imshow(flux0, clim=flux_lims, cmap="rainbow", origin="lower")
-    fig.colorbar(im_flux, location="bottom")
+    ax_plots = axs[1]
+    # ax_avg_b.set_title("Average Vegetation")
+    ax_plots.plot(ts, b.mean(axis=(1, 2)), color="green", label="Average Vegetation")
+    ax_plots.plot(ts, b.std(axis=(1, 2)), color="orange", label="Std Vegetation")
+    ax_plots.plot(ts, flux[:, 0, :].sum(axis=1), color="blue", label="Water Flux (Aggregated)")
+    ax_plots.legend()
 
-    ax_flux_agg = axs[2]
-    ax_flux_agg.set_title("Water Flux at Buttom Boundry")
-    ax_flux_agg.plot(ts, -flux[:, 0, :].sum(axis=1), color="blue")
-    im_flux_time = ax_flux_agg.plot(ts[0], -flux[0, 0, :].sum(), color="red", marker="o")[0]
+    point_b = ax_plots.plot(ts[0], b[0].mean(), color="red", marker="o")[0]
+    point_avg_b = ax_plots.plot(ts[0], b[0].std(), color="red", marker="o")[0]
+    point_flux = ax_plots.plot(ts[0], flux[0, 0, :].sum(), color="red", marker="o")[0]
 
     fig.set_size_inches(14, 8)
     fig.subplots_adjust(wspace=0.3, hspace=0.3)
@@ -60,11 +59,13 @@ def create_animation_func(processed, pbar):
         title.set_text(f"$t={t:.1f}[yr]$")
         
         im_b.set_array(b)
-        im_flux.set_array(flux)
-        im_flux_time.set_data([t], [-flux[0,:].sum()])
+        
+        point_b.set_data([t], [b.mean()])
+        point_avg_b.set_data([t], [b.std()])
+        point_flux.set_data([t], [flux[0, :].sum()])
 
         plt.draw()
-        return [im_b, im_flux, im_flux_time]
+        return [im_b, point_b, point_avg_b, point_flux]
 
     return fig, dict_to_frames(processed), animation_func
 
@@ -74,6 +75,7 @@ def plot(path_raw, path_video):
 
     pbar = tqdm.tqdm(total=len(processed["times"]))
     fig, frames, animation_func = create_animation_func(processed, pbar)
+
     ani = animation.FuncAnimation(
         fig,
         animation_func,

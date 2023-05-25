@@ -126,19 +126,19 @@ def run_simulation(output: Path, n: int, tmax: int, L: int, percipitation: float
     grid = pde.CartesianGrid(grid_range, shape, periodic=[True, False])
     terrain = pde.ScalarField(grid, np.fromfunction(lambda _, y: y * slope, shape))
 
-    b = pde.ScalarField.random_uniform(grid, 0, 1e-6)
-    w = pde.ScalarField(grid, 0)
-    h = pde.ScalarField(grid, 0)
-    state = pde.FieldCollection([b, w, h])
-
     bc_zero_derivative = {"derivative": 0}
-    bc_zero_flux = {"curvature": 0}
+    bc_zero_flux = {"value": 0}
     bc_periodic = "auto_periodic_neumann"
     bc = [bc_periodic, [bc_zero_flux, bc_zero_derivative]]
 
     eq = ModelPDE(bc, terrain, p=percipitation)
     solver = ExplicitMPISolver(eq)
     storage = pde.FileStorage(output)
+
+    b = pde.ScalarField.random_uniform(grid, 0, 1e-6)
+    w = pde.ScalarField(grid, eq._p / eq._nu)
+    h = pde.ScalarField(grid, eq._p / eq._a)
+    state = pde.FieldCollection([b, w, h])
 
     controller = Controller(
         solver, t_range=tmax, tracker=["progress", storage.tracker(1)]
